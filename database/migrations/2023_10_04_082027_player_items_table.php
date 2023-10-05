@@ -15,7 +15,7 @@ class PlayerItemsTable extends Migration
     {
         Schema::create('player_items', function (Blueprint $table) {
             
-            //カラム
+            //カラム一覧
             $table->unsignedBigInteger('player_id')->comment("プレイヤーID");
             $table->unsignedBigInteger('item_id')->comment("アイテムID");
             $table->integer('count')->comment("所持個数");
