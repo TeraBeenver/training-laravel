@@ -18,7 +18,7 @@ class PlayerItemsTable extends Migration
             //カラム
             $table->unsignedBigInteger('player_id')->comment("プレイヤーID");
             $table->unsignedBigInteger('item_id')->comment("アイテムID");
-            $table->integer('count')->comment("所持個数");
+            $table->integer('count')->comment("現在所持個数");
 
             //playerとitemのidを複合主キーとして持つ
             $table->primary(['player_id', 'item_id']);
