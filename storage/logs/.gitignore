@@ -1,2 +1,7 @@
 *
 !.gitignore
+
+# .gitignore
+
+# Ignore Composer lock file
+composer.lock
