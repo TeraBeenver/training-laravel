@@ -8,7 +8,9 @@ use App\Models\Item;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB; 
+
+use function PHPUnit\Framework\throwException;
 
 class PlayerItemsController extends Controller
 {
