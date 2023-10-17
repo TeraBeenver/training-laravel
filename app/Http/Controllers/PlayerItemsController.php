@@ -38,7 +38,9 @@ class PlayerItemsController extends Controller
         }
 
         // 既存のアイテムが存在する場合、countを加算
-        $playerItem->count += $request->count;
+        PlayerItems::where('player_id', $id)
+                    ->where('item_id',  $request->itemId)
+                    ->Update(['count'=>$playerItem->count + 1]);
 
         // データベースに保存
         $playerItem->save();
@@ -73,39 +75,41 @@ class PlayerItemsController extends Controller
             // アイテムごとの処理
             if ($request->itemId == 1) 
             { // HPかいふく薬
+                if($player->hp == $maxHp)
+                {
+                    return response()->json(['error' => 'Maxhp'], 400);
+                }
                 // アイテムの値を取得
                 $itemValue = Item::where('id', $request->itemId)->value('value');
 
                 // HP増加処理
-                if ($player->hp < $maxHp) // HPが上限に達していない場合のみ処理
-                {
-                    $newHp = min($maxHp, $player->hp + $itemValue);
-                    $player->hp = $newHp;
-                    PlayerItems::where('player_id', $id)
-                    ->where('item_id',  $request->itemId)
-                    ->Update(['count'=>$playerItem->count - 1]);
-                }
+                $newHp = min($maxHp, $player->hp + $itemValue);
+                $player->hp = $newHp;
+                
             } 
             elseif ($request->itemId == 2) 
             { // MPかいふく薬
+                if($player->mp == $maxMp)
+                {
+                    return response()->json(['error' => 'Maxmp'], 400);
+                }
                 // アイテムの値を取得
                 $itemValue = Item::where('id', $request->itemId)->value('value');
                 
                 // MP増加処理
-                if ($player->mp < $maxMp) // MPが上限に達していない場合のみ処理
-                {
-                    $newMp = min($maxMp, $player->mp + $itemValue);
-                    $player->mp = $newMp;
-                    PlayerItems::where('player_id', $id)
-                    ->where('item_id',  $request->itemId)
-                    ->Update(['count'=>$playerItem->count - 1]);
-                }
+                $newMp = min($maxMp, $player->mp + $itemValue);
+                $player->mp = $newMp;
+                
             } 
             else
             {
                 // 不明なアイテムの場合はエラーレスポンスを返す
                 return response()->json(['error' => 'Unknown item'], 400);
             }
+
+            PlayerItems::where('player_id', $id)
+                    ->where('item_id',  $request->itemId)
+                    ->Update(['count'=>$playerItem->count - 1]);
 
             // プレイヤーのステータスを保存
             $player->save();
@@ -116,7 +120,7 @@ class PlayerItemsController extends Controller
             // レスポンスを返す
             return response()->json([
                 'itemId' => $request->itemId,
-                'count' => $playerItem->count,
+                'count' => $playerItem->count - 1,
                 'player' => [
                     'id' => $player->id,
                     'hp' => $player->hp,
