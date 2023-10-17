@@ -84,7 +84,6 @@ class PlayerItemsController extends Controller
                     PlayerItems::where('player_id', $id)
                     ->where('item_id',  $request->itemId)
                     ->Update(['count'=>$playerItem->count - 1]);
-                    //$playerItem->count -= 1;
                 }
             } 
             elseif ($request->itemId == 2) 
@@ -100,7 +99,6 @@ class PlayerItemsController extends Controller
                     PlayerItems::where('player_id', $id)
                     ->where('item_id',  $request->itemId)
                     ->Update(['count'=>$playerItem->count - 1]);
-                    //$playerItem->count -= 1;
                 }
             } 
             else
