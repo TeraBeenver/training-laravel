@@ -129,4 +129,111 @@ class PlayerItemsController extends Controller
         }
     }
 
+    // ガチャの抽選処理を修正
+    private function selectItemByProbability()
+    {
+        // 各アイテムのpercentを取得
+        $items = Item::all(['id', 'percent'])->toArray();
+
+        // ランダムな数値を生成
+        $randomPercent = mt_rand(1, 100); // 1から100までの範囲でランダム
+
+        $selectedItemId = null;
+        $currentPercent = 0;
+
+        foreach ($items as $item) {
+            $currentPercent += $item['percent'];
+
+            if ($randomPercent <= $currentPercent) {
+                $selectedItemId = $item['id'];
+                break;
+            }
+        }
+
+        return $selectedItemId;
+    }
+
+    // ガチャの利用処理を修正
+    public function useGacha(Request $request, $id)
+    {
+        // プレイヤーの存在確認
+        $player = Player::find($id);
+
+        // 所持金の確認
+        $gachaCount = $request->input('count');
+        $gachaCost = 10;
+        $totalCost = $gachaCount * $gachaCost;
+
+        if (!$player || $player->money < $totalCost) {
+            return response()->json(['error' => 'Not enough money to perform Gacha.'], 400);
+        }
+
+        // ガチャを引く
+        $gachaResults = [];
+
+        // アイテムごとの count を保存する変数
+        $itemCounts = [];
+
+        for ($i = 0; $i < $gachaCount; $i++) {
+            // アイテムの抽選
+            $selectedItemId = $this->selectItemByProbability();
+    
+            // ハズレの場合はスキップ
+            if ($selectedItemId) {
+                // アイテムの増加処理
+                $playerItem = PlayerItems::where('player_id', $player->id)
+                    ->where('item_id', $selectedItemId)
+                    ->first();
+    
+                if ($playerItem) {
+                    // アイテムが存在する場合はカウントを増やす
+                    // アイテムが既に存在する場合は count を加算
+                    PlayerItems::where('player_id', $player->id)
+                    ->where('item_id',  $selectedItemId)
+                    ->Update(['count'=>$playerItem->count + 1]);
+                } else {
+                    // アイテムが存在しない場合は新しく追加
+                    PlayerItems::create([
+                        'player_id' => $player->id,
+                        'item_id' => $selectedItemId,
+                        'count' => 1
+                    ]);
+                }
+    
+                $gachaResults[] = [
+                    'itemId' => $selectedItemId,
+                    'count' => 1,
+                ];
+    
+                // count を保存
+                if (!isset($itemCounts[$selectedItemId])) {
+                    $itemCounts[$selectedItemId] = 0;
+                }
+                $itemCounts[$selectedItemId]++;
+            }
+        }
+
+        // 所持金の更新
+        $player->money -= $totalCost;
+        $player->save();
+
+        // ガチャが発生したアイテムの総和を表示
+        $totalGachaResults = [];
+        foreach ($itemCounts as $itemId => $count) {
+            $totalGachaResults[] = [
+                'itemId' => $itemId,
+                'count' => $count,
+            ];
+        }
+
+        // レスポンスを返す
+        return response()->json([
+            'results' => $totalGachaResults,
+            'player' => [
+                'money' => $player->money,
+                'items' => $id = PlayerItems::select('item_id as itemId', 'count')->get(),
+            ],
+        ]);
+    }
+
 }
