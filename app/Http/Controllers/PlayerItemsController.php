@@ -8,6 +8,7 @@ use App\Models\Item;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB; 
 
 class PlayerItemsController extends Controller
 {
@@ -37,7 +38,9 @@ class PlayerItemsController extends Controller
         }
 
         // 既存のアイテムが存在する場合、countを加算
-        $playerItem->count += $request->count;
+        PlayerItems::where('player_id', $id)
+                    ->where('item_id',  $request->itemId)
+                    ->Update(['count'=>$playerItem->count + 1]);
 
         // データベースに保存
         $playerItem->save();
@@ -50,72 +53,85 @@ class PlayerItemsController extends Controller
     //アイテムの使用処理
     public function useItem(Request $request, $id)
     {
-    // プレイヤーIDとアイテムIDでレコードをデータベースから検索
-    $playerItem = PlayerItems::where('player_id', $id)
-        ->where('item_id', $request->itemId)
-        ->first();
+        try {
+            DB::beginTransaction();
+            // プレイヤーIDとアイテムIDでレコードをデータベースから検索
+            $playerItem = PlayerItems::where('player_id', $id)
+                ->where('item_id', $request->itemId)
+                ->lockForUpdate() // 行をロックして他のトランザクションからの変更を防ぐ
+                ->first();
+            // アイテムの所持数がゼロ && アイテムが存在しない場合はエラーレスポンスを返す
+            if (!$playerItem || $playerItem->count <= 0) {
+                return response()->json(['error' => 'No items remaining'], 400);
+            }
 
-    // アイテムの所持数がゼロ && アイテムが存在しない場合はエラーレスポンスを返す
-    if (!$playerItem || $playerItem->count <= 0) {
-        return response()->json(['error' => 'No items remaining'], 400);
-    }
+            // HPとMPの上限は200
+            $maxHp = 200;
+            $maxMp = 200;
+            
+            // プレイヤーのステータスを取得
+            $player = Player::find($id);
+            
+            // アイテムごとの処理
+            if ($request->itemId == 1) 
+            { // HPかいふく薬
+                if($player->hp == $maxHp)
+                {
+                    return response()->json(['error' => 'Maxhp'], 400);
+                }
+                // アイテムの値を取得
+                $itemValue = Item::where('id', $request->itemId)->value('value');
 
-    // HPとMPの上限は200
-    $maxHp = 200;
-    $maxMp = 200;
+                // HP増加処理
+                $newHp = min($maxHp, $player->hp + $itemValue);
+                $player->hp = $newHp;
+                
+            } 
+            elseif ($request->itemId == 2) 
+            { // MPかいふく薬
+                if($player->mp == $maxMp)
+                {
+                    return response()->json(['error' => 'Maxmp'], 400);
+                }
+                // アイテムの値を取得
+                $itemValue = Item::where('id', $request->itemId)->value('value');
+                
+                // MP増加処理
+                $newMp = min($maxMp, $player->mp + $itemValue);
+                $player->mp = $newMp;
+                
+            } 
+            else
+            {
+                // 不明なアイテムの場合はエラーレスポンスを返す
+                return response()->json(['error' => 'Unknown item'], 400);
+            }
 
-    // プレイヤーのステータスを取得
-    $player = Player::find($id);
+            PlayerItems::where('player_id', $id)
+                    ->where('item_id',  $request->itemId)
+                    ->Update(['count'=>$playerItem->count - 1]);
 
-    // アイテムごとの処理
-    if ($request->itemId == 1) 
-    { // HPかいふく薬
-        // アイテムの値を取得
-        $itemValue = Item::where('id', $request->itemId)->value('value');
+            // プレイヤーのステータスを保存
+            $player->save();
+            $playerItem->save();
 
-        // HP増加処理
-        if($player->hp < $maxHp)// HPが上限に達していない場合のみ処理
-        {
-            $newHp = min($maxHp, $player->hp + $itemValue);
-
-            $player->hp = $newHp;
-            $playerItem->count -= 1;
+            DB::commit();
+            
+            // レスポンスを返す
+            return response()->json([
+                'itemId' => $request->itemId,
+                'count' => $playerItem->count - 1,
+                'player' => [
+                    'id' => $player->id,
+                    'hp' => $player->hp,
+                    'mp' => $player->mp,
+                ],
+            ]);
+        } 
+        catch (\Exception $e) {
+            // トランザクション中に例外が発生した場合の処理
+            DB::rollBack();
+            return response()->json(['error' => 'Transaction failed'], 500);
         }
-    } 
-    elseif ($request->itemId == 2) 
-    { // MPかいふく薬
-        // アイテムの値を取得
-        $itemValue = Item::where('id', $request->itemId)->value('value');
-
-        // MP増加処理
-        if($player->mp < $maxMp)// MPが上限に達していない場合のみ処理
-        {
-            $newMp = min($maxMp, $player->mp + $itemValue);
-
-            $player->mp = $newMp;
-            $playerItem->count -= 1;
-        }
-    } 
-    else
-    {
-        // 不明なアイテムの場合はエラーレスポンスを返す
-        return response()->json(['error' => 'Unknown item'], 400);
     }
-
-    // プレイヤーのステータスを保存
-    $player->save();
-    $playerItem->save();
-
-    // レスポンスを返す
-    return response()->json([
-        'itemId' => $request->itemId,
-        'count' => $playerItem->count,
-        'player' => [
-            'id' => $player->id,
-            'hp' => $player->hp,
-            'mp' => $player->mp,
-        ],
-    ]);
-    }
-    
 }
